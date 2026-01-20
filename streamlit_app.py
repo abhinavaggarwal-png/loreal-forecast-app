@@ -21,6 +21,27 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS to make primary buttons blue instead of red
+st.markdown("""
+<style>
+    /* Primary button - blue */
+    .stButton > button[kind="primary"] {
+        background-color: #3B82F6;
+        border-color: #3B82F6;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background-color: #2563EB;
+        border-color: #2563EB;
+    }
+    
+    /* Secondary button - light blue on hover */
+    .stButton > button[kind="secondary"]:hover {
+        border-color: #3B82F6;
+        color: #3B82F6;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 MODEL_PATH = 'models/loreal_blinkit_monthly.pkl'
 
 # ============================================================
@@ -387,28 +408,29 @@ def main():
             )
             week_totals[week_key] = adj_total
         
-        # Week selector
+        # Initialize selected week in session state
+        if 'selected_week' not in st.session_state:
+            st.session_state.selected_week = 'W1'
+        
+        # Week selector as clickable cards
         st.markdown("#### 📅 Select Week")
         
-        # Use selectbox instead of buttons to avoid key conflicts
-        selected_week = st.selectbox(
-            "Choose week",
-            options=list(JANUARY_WEEKS.keys()),
-            format_func=lambda x: f"{JANUARY_WEEKS[x]['short']} - {JANUARY_WEEKS[x]['label']} ({week_totals[x]/1000:.0f}K units)",
-            key="jan_week_selector",
-            label_visibility="collapsed"
-        )
-        
-        # Show week summary cards
         w_cols = st.columns(4)
-        for i, (week_key, week_config) in enumerate(JANUARY_WEEKS.items()):
+        for i, (week_key, wk_config) in enumerate(JANUARY_WEEKS.items()):
             with w_cols[i]:
                 total = week_totals[week_key]
-                if week_key == selected_week:
-                    st.success(f"**{week_config['short']}**  \n{total/1000:.0f}K units")
-                else:
-                    st.info(f"**{week_config['short']}**  \n{total/1000:.0f}K units")
+                is_selected = st.session_state.selected_week == week_key
+                
+                if st.button(
+                    f"**{wk_config['short']}**\n\n{total/1000:.0f}K units",
+                    key=f"week_btn_{week_key}",
+                    use_container_width=True,
+                    type="primary" if is_selected else "secondary"
+                ):
+                    st.session_state.selected_week = week_key
+                    st.rerun()
         
+        selected_week = st.session_state.selected_week
         week_config = JANUARY_WEEKS[selected_week]
         
         # Get forecast for selected week
