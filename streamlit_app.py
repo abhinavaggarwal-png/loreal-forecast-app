@@ -336,10 +336,44 @@ def main():
     st.sidebar.title("⚙️ What-If Levers")
     st.sidebar.markdown("Adjust parameters to see impact on forecast")
     
+    # ========================================================================
+    # EXTRACT BASELINE VALUES FROM MODEL
+    # ========================================================================
+    baseline_features = model_artifact['baseline_features']
+    
+    # Get baseline discount % (average across SKU-cities)
+    if 'own_discount_depth' in baseline_features.columns:
+        baseline_discount = baseline_features['own_discount_depth'].mean() * 100
+    elif 'own_discount_pct' in baseline_features.columns:
+        baseline_discount = baseline_features['own_discount_pct'].mean()
+    elif 'own_discount' in baseline_features.columns:
+        baseline_discount = baseline_features['own_discount'].mean() * 100
+    else:
+        baseline_discount = 18.0  # Default realistic value for FMCG on Blinkit
+    
+    # Get competitor discount baseline
+    if 'comp_discount_depth' in baseline_features.columns:
+        baseline_comp_discount = baseline_features['comp_discount_depth'].mean() * 100
+    elif 'comp_discount_pct' in baseline_features.columns:
+        baseline_comp_discount = baseline_features['comp_discount_pct'].mean()
+    elif 'comp_discount' in baseline_features.columns:
+        baseline_comp_discount = baseline_features['comp_discount'].mean() * 100
+    else:
+        baseline_comp_discount = 15.0  # Default
+    
+    # Get ad spend baseline (in Lakhs)
+    if 'ad_spends' in baseline_features.columns:
+        baseline_ad_spend = baseline_features['ad_spends'].sum() / 100000  # Convert to Lakhs
+    elif 'own_estimated_budget_consumed_v2' in baseline_features.columns:
+        baseline_ad_spend = baseline_features['own_estimated_budget_consumed_v2'].sum() / 100000
+    else:
+        baseline_ad_spend = 12.0  # Default ₹12L/month
+    
     st.sidebar.markdown("---")
     
     # Discount slider
     st.sidebar.markdown("### 🏷️ Own Discount")
+    st.sidebar.caption(f"📊 Last Month Avg: **{baseline_discount:.1f}%**")
     discount_change = st.sidebar.slider(
         "% Change from Baseline",
         min_value=-50,
@@ -349,10 +383,12 @@ def main():
         help="Adjust your pricing discount strategy",
         key="discount_slider"
     )
-    st.sidebar.caption(f"Change: {discount_change:+d}%")
+    new_discount = baseline_discount * (1 + discount_change/100)
+    st.sidebar.caption(f"Change: {discount_change:+d}% → New: **{new_discount:.1f}%**")
     
     # Competitor discount slider
     st.sidebar.markdown("### 🏷️ Competitor Discount")
+    st.sidebar.caption(f"📊 Last Month Avg: **{baseline_comp_discount:.1f}%**")
     comp_discount_change = st.sidebar.slider(
         "% Change from Baseline",
         min_value=-50,
@@ -362,10 +398,12 @@ def main():
         help="Expected competitor discount change",
         key="comp_discount_slider"
     )
-    st.sidebar.caption(f"Change: {comp_discount_change:+d}%")
+    new_comp_discount = baseline_comp_discount * (1 + comp_discount_change/100)
+    st.sidebar.caption(f"Change: {comp_discount_change:+d}% → New: **{new_comp_discount:.1f}%**")
     
     # Marketing slider
     st.sidebar.markdown("### 💰 Ad Spend")
+    st.sidebar.caption(f"📊 Last Month: **₹{baseline_ad_spend:.1f}L**")
     ad_spend_change = st.sidebar.slider(
         "% Change from Baseline",
         min_value=-50,
@@ -375,7 +413,8 @@ def main():
         help="Adjust your marketing spend",
         key="adspend_slider"
     )
-    st.sidebar.caption(f"Change: {ad_spend_change:+d}%")
+    new_ad_spend = baseline_ad_spend * (1 + ad_spend_change/100)
+    st.sidebar.caption(f"Change: {ad_spend_change:+d}% → New: **₹{new_ad_spend:.1f}L**")
     
     # Show adjustment summary in sidebar
     if discount_change != 0 or comp_discount_change != 0 or ad_spend_change != 0:
