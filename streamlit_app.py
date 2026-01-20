@@ -144,6 +144,14 @@ def apply_adjustments(baseline_df, multiplier, discount_pct, comp_discount_pct, 
     df['pred'] = df['pred_base'] * multiplier
     baseline_total = df['pred'].sum()
     
+    # Calculate Dec actuals from lag_1 (sales per day * days)
+    # Apply same multiplier to split Dec total into comparable week/month portions
+    if 'lag_1' in df.columns:
+        dec_total = df['lag_1'] * df['days_in_period']  # Full Dec actuals
+        df['dec_actual'] = dec_total * multiplier  # Split by same week/month proportion
+    else:
+        df['dec_actual'] = 0
+    
     # Apply elasticities
     discount_effect = calculate_discount_effect(discount_pct)
     comp_effect = calculate_comp_discount_effect(comp_discount_pct)
@@ -156,7 +164,8 @@ def apply_adjustments(baseline_df, multiplier, discount_pct, comp_discount_pct, 
     # Aggregate to national level if needed
     if aggregate_national:
         df = df.groupby(['item_id', 'item_name', 'bgr']).agg({
-            'pred': 'sum'
+            'pred': 'sum',
+            'dec_actual': 'sum'
         }).reset_index()
         df['city_norm'] = 'National'
     
@@ -537,13 +546,18 @@ def main():
         
         with jan_tab3:
             st.subheader(f"Forecast Data - January {selected_week}")
-            jan_display_df = jan_forecast_df[['city_norm', 'item_id', 'item_name', 'bgr', 'pred']].copy()
+            jan_display_df = jan_forecast_df[['city_norm', 'item_id', 'item_name', 'bgr', 'dec_actual', 'pred']].copy()
             jan_display_df = jan_display_df.rename(columns={
                 'city_norm': 'City', 'item_id': 'Item ID', 'item_name': 'Item Name',
-                'bgr': 'Category', 'pred': 'Forecast'
+                'bgr': 'Category', 'dec_actual': 'Dec Actuals', 'pred': 'Forecast'
             })
             jan_display_df['Forecast_raw'] = jan_display_df['Forecast']
+            jan_display_df['Dec Actuals'] = jan_display_df['Dec Actuals'].round(0).astype(int)
             jan_display_df['Forecast'] = jan_display_df['Forecast'].round(0).astype(int)
+            
+            # Calculate growth %
+            jan_display_df['Growth %'] = ((jan_display_df['Forecast'] / jan_display_df['Dec Actuals'].replace(0, 1)) - 1) * 100
+            jan_display_df['Growth %'] = jan_display_df['Growth %'].round(1)
             
             fc1, fc2, fc3 = st.columns(3)
             with fc1:
@@ -565,9 +579,12 @@ def main():
                 jan_filtered = jan_filtered[jan_filtered['Item ID'] == jan_sel_sku]
             
             jan_total_forecast = jan_filtered['Forecast_raw'].sum()
-            st.markdown(f"**Showing {len(jan_filtered):,} records | Total Forecast: {jan_total_forecast:,.0f} units**")
+            jan_total_actual = jan_filtered['Dec Actuals'].sum()
+            st.markdown(f"**Showing {len(jan_filtered):,} records | Dec Actuals: {jan_total_actual:,.0f} | Forecast: {jan_total_forecast:,.0f} units**")
             
             jan_filtered_display = jan_filtered.drop(columns=['Forecast_raw'])
+            # Reorder columns
+            jan_filtered_display = jan_filtered_display[['City', 'Item ID', 'Item Name', 'Category', 'Dec Actuals', 'Forecast', 'Growth %']]
             st.dataframe(jan_filtered_display.sort_values('Forecast', ascending=False), height=400, use_container_width=True, hide_index=True)
             
             jan_csv = jan_filtered_display.to_csv(index=False)
@@ -637,13 +654,18 @@ def main():
         
         with feb_tab3:
             st.subheader("Forecast Data - February 2026")
-            feb_display_df = feb_forecast_df[['item_id', 'item_name', 'bgr', 'pred']].copy()
+            feb_display_df = feb_forecast_df[['item_id', 'item_name', 'bgr', 'dec_actual', 'pred']].copy()
             feb_display_df = feb_display_df.rename(columns={
                 'item_id': 'Item ID', 'item_name': 'Item Name',
-                'bgr': 'Category', 'pred': 'Forecast'
+                'bgr': 'Category', 'dec_actual': 'Dec Actuals', 'pred': 'Forecast'
             })
             feb_display_df['Forecast_raw'] = feb_display_df['Forecast']
+            feb_display_df['Dec Actuals'] = feb_display_df['Dec Actuals'].round(0).astype(int)
             feb_display_df['Forecast'] = feb_display_df['Forecast'].round(0).astype(int)
+            
+            # Calculate growth %
+            feb_display_df['Growth %'] = ((feb_display_df['Forecast'] / feb_display_df['Dec Actuals'].replace(0, 1)) - 1) * 100
+            feb_display_df['Growth %'] = feb_display_df['Growth %'].round(1)
             
             fc1, fc2 = st.columns(2)
             with fc1:
@@ -660,9 +682,12 @@ def main():
                 feb_filtered = feb_filtered[feb_filtered['Item ID'] == feb_sel_sku]
             
             feb_total_forecast = feb_filtered['Forecast_raw'].sum()
-            st.markdown(f"**Showing {len(feb_filtered):,} records | Total Forecast: {feb_total_forecast:,.0f} units**")
+            feb_total_actual = feb_filtered['Dec Actuals'].sum()
+            st.markdown(f"**Showing {len(feb_filtered):,} records | Dec Actuals: {feb_total_actual:,.0f} | Forecast: {feb_total_forecast:,.0f} units**")
             
             feb_filtered_display = feb_filtered.drop(columns=['Forecast_raw'])
+            # Reorder columns
+            feb_filtered_display = feb_filtered_display[['Item ID', 'Item Name', 'Category', 'Dec Actuals', 'Forecast', 'Growth %']]
             st.dataframe(feb_filtered_display.sort_values('Forecast', ascending=False), height=400, use_container_width=True, hide_index=True)
             
             feb_csv = feb_filtered_display.to_csv(index=False)
@@ -732,13 +757,18 @@ def main():
         
         with mar_tab3:
             st.subheader("Forecast Data - March 2026")
-            mar_display_df = mar_forecast_df[['item_id', 'item_name', 'bgr', 'pred']].copy()
+            mar_display_df = mar_forecast_df[['item_id', 'item_name', 'bgr', 'dec_actual', 'pred']].copy()
             mar_display_df = mar_display_df.rename(columns={
                 'item_id': 'Item ID', 'item_name': 'Item Name',
-                'bgr': 'Category', 'pred': 'Forecast'
+                'bgr': 'Category', 'dec_actual': 'Dec Actuals', 'pred': 'Forecast'
             })
             mar_display_df['Forecast_raw'] = mar_display_df['Forecast']
+            mar_display_df['Dec Actuals'] = mar_display_df['Dec Actuals'].round(0).astype(int)
             mar_display_df['Forecast'] = mar_display_df['Forecast'].round(0).astype(int)
+            
+            # Calculate growth %
+            mar_display_df['Growth %'] = ((mar_display_df['Forecast'] / mar_display_df['Dec Actuals'].replace(0, 1)) - 1) * 100
+            mar_display_df['Growth %'] = mar_display_df['Growth %'].round(1)
             
             fc1, fc2 = st.columns(2)
             with fc1:
@@ -755,9 +785,12 @@ def main():
                 mar_filtered = mar_filtered[mar_filtered['Item ID'] == mar_sel_sku]
             
             mar_total_forecast = mar_filtered['Forecast_raw'].sum()
-            st.markdown(f"**Showing {len(mar_filtered):,} records | Total Forecast: {mar_total_forecast:,.0f} units**")
+            mar_total_actual = mar_filtered['Dec Actuals'].sum()
+            st.markdown(f"**Showing {len(mar_filtered):,} records | Dec Actuals: {mar_total_actual:,.0f} | Forecast: {mar_total_forecast:,.0f} units**")
             
             mar_filtered_display = mar_filtered.drop(columns=['Forecast_raw'])
+            # Reorder columns
+            mar_filtered_display = mar_filtered_display[['Item ID', 'Item Name', 'Category', 'Dec Actuals', 'Forecast', 'Growth %']]
             st.dataframe(mar_filtered_display.sort_values('Forecast', ascending=False), height=400, use_container_width=True, hide_index=True)
             
             mar_csv = mar_filtered_display.to_csv(index=False)
