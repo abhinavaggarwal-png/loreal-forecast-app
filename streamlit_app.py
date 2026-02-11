@@ -14,7 +14,7 @@ st.markdown("""<style>
 .stButton>button[kind="primary"]{background:#3B82F6;border-color:#3B82F6}
 </style>""", unsafe_allow_html=True)
 
-DATA_DIR = 'streamlit_data'
+DATA_DIR = 'data'
 
 @st.cache_data
 def load_data():
